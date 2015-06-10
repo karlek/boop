@@ -11,7 +11,7 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/karlek/kth/boop"
+	"github.com/karlek/boop"
 
 	"code.google.com/p/mahonia"
 	"github.com/mewkiz/pkg/errutil"
