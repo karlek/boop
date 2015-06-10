@@ -4,6 +4,7 @@ package xfinger
 
 import (
 	"fmt"
+	"log"
 	"net/url"
 
 	"code.google.com/p/go.net/html"
@@ -52,7 +53,7 @@ func Lookup(name string) ([]*url.URL, error) {
 }
 
 // Single takes a name and returns the potential images of that person.
-func Single(name string) (*url.URL, error) {
+func Single(name string) (u *url.URL, err error) {
 	urls, err := Lookup(name)
 	if err != nil {
 		return nil, errutil.Err(err)
@@ -60,5 +61,8 @@ func Single(name string) (*url.URL, error) {
 	if urls == nil {
 		return nil, errutil.NewNoPosf("no match found for: %s.", name)
 	}
-	return urls[0], nil
+	if len(urls) > 1 {
+		log.Println(errutil.NewNoPosf("more than %d hits for: %s.", len(urls), name))
+	}
+	return urls[0], err
 }

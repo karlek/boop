@@ -73,8 +73,8 @@ func main() {
 func errWrapLookup(name string, osqChan chan Osquarulda) {
 	err := lookup(name, osqChan)
 	if err != nil {
-		osqChan <- Osquarulda{ImgUrl: nil}
 		log.Println(err)
+		osqChan <- Osquarulda{ImgUrl: nil}
 	}
 }
 
