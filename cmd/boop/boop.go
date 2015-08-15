@@ -10,10 +10,12 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"sync"
 
 	"github.com/karlek/boop"
 
 	"code.google.com/p/mahonia"
+	"github.com/karlek/profile"
 	"github.com/mewkiz/pkg/errutil"
 	"github.com/mewkiz/pkg/httputil"
 )
@@ -42,31 +44,27 @@ func main() {
 		os.Exit(0)
 	}
 
+	defer profile.Start(profile.CPUProfile).Stop()
 	// Count go routines.
-	numNames := 0
 	osqChan := make(chan Osquarulda)
 	for _, name := range flag.Args() {
 		go errWrapLookup(name, osqChan)
-		numNames++
 	}
 
-	// Count go routines.
-	numDownloads := 0
-	boolChan := make(chan bool)
-	for ; numNames > 0; numNames-- {
-		imgUrl := <-osqChan
-		if imgUrl.ImgUrl == nil {
+	// Download waitgroup.
+	wg := new(sync.WaitGroup)
+	for argc := flag.NArg(); argc > 0; argc-- {
+		osq := <-osqChan
+		// Ignore empty images.
+		if osq.ImgUrl == nil {
 			continue
 		}
 
-		go errWrapDownload(imgUrl, boolChan)
-		numDownloads++
+		go errWrapDownload(osq, wg)
+		wg.Add(1)
 	}
-
-	// Wait for all downloads to complete.
-	for ; numDownloads > 0; numDownloads-- {
-		<-boolChan
-	}
+	// Wait for downloads!
+	wg.Wait()
 }
 
 // errWrapLookup handles errors for lookup().
@@ -96,6 +94,7 @@ func lookup(name string, osqChan chan Osquarulda) (err error) {
 	return nil
 }
 
+// urlEncode is used for xfingers ISO-8859-1 encoding of special characters.
 func urlEncode(name string) (string, error) {
 	n, ok := mahonia.NewEncoder("ISO-8859-1").ConvertStringOK(name)
 	if !ok {
@@ -104,19 +103,23 @@ func urlEncode(name string) (string, error) {
 	return url.QueryEscape(n), nil
 }
 
-func errWrapDownload(osq Osquarulda, boolChan chan bool) {
+// errWrapDownload handles errors for download().
+func errWrapDownload(osq Osquarulda, wg *sync.WaitGroup) {
 	err := download(osq)
 	if err != nil {
 		log.Println(err)
 	}
-	boolChan <- true
+	wg.Done()
 }
 
+// download downloads non-placeholding Osquarulda images and saves them in the
+// current folder.
 func download(osq Osquarulda) (err error) {
 	buf, err := httputil.Get(osq.ImgUrl.String())
 	if err != nil {
 		return errutil.Err(err)
 	}
+	// Compare the image to the placeholder image.
 	if bytes.Equal(buf, defaultPic) {
 		return errutil.NewNoPosf("%s missing picture.", osq.Name)
 	}
